@@ -1,0 +1,8 @@
+.git
+.env
+.venv
+data
+__pycache__
+tests
+samsara-reference.html
+samsara-page.json
