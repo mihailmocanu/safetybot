@@ -82,6 +82,7 @@ class Application:
             self.store.check_connection()
             message = await self.bot.send_message(
                 self.cfg.group_id, notification(event, self.cfg.company, self.cfg.timezone),
+                parse_mode="HTML",
                 link_preview_options=LinkPreviewOptions(is_disabled=True),
             )
             text_id = message.message_id
@@ -104,7 +105,8 @@ class Application:
                 self.store.check_connection()
                 message = await self.bot.send_video(
                     self.cfg.group_id, FSInputFile(path), supports_streaming=True,
-                    caption=f"🎥 Samsara Safety • {camera}\nEvent ID: {event_id}",
+                    caption=notification(event, self.cfg.company, self.cfg.timezone, video=True),
+                    parse_mode="HTML",
                     reply_parameters=ReplyParameters(message_id=text_id, allow_sending_without_reply=True),
                     request_timeout=180,
                 )

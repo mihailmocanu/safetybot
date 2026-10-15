@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from html import escape
+import math
 import re
 from zoneinfo import ZoneInfo
 
@@ -43,37 +45,63 @@ def clean(value, limit=200):
     return " ".join(str(value).split())[:limit]
 
 
-def notification(event, company, tz):
-    lines = ["🚨 SAMSARA SAFETY ALERT", "", f"🏢 Companie: {clean(company)}"]
-    for obj, title in (("asset", "🚛 Truck"), ("driver", "👤 Driver")):
-        value = event.get(obj) or {}
-        if value.get("name"):
-            lines.append(f"{title}: {clean(value['name'])}")
-        elif value.get("id"):
-            lines.append(f"{title} ID: {clean(value['id'])}")
-    lines.append("")
-    names = ", ".join(display_label(x) for x in labels(event))
-    if names:
-        lines.append(f"⚠️ Event: {clean(names, 600)}")
-    if event.get("startMs") is not None:
-        try:
-            when = parse_time(event["startMs"]).astimezone(ZoneInfo(tz))
-            lines.extend([f"📅 Date: {when:%m/%d/%Y}", f"🕒 Time: {when:%H:%M %Z}"])
-        except (ValueError, TypeError, OverflowError):
-            lines.append(f"📅 Timestamp Samsara: {clean(event['startMs'])}")
+def speeding_details(event):
+    if not CATEGORIES["Speeding"].intersection(labels(event)):
+        return []
+    metadata = event.get("speedingMetadata") or {}
+
+    def speed(key):
+        value = metadata.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0:
+            return value / 1.609344
+        return None
+
+    maximum = speed("maxSpeedKilometersPerHour")
+    limit = speed("postedSpeedLimitKilometersPerHour")
+    lines = []
+    if maximum is not None:
+        lines.append(f"Max speed: {maximum:.1f} mph")
+    if limit is not None and limit > 0:
+        lines.append(f"Posted limit: {limit:.1f} mph")
+        if maximum is not None and maximum >= limit:
+            lines.append(f"Over posted limit: {maximum - limit:.1f} mph")
+    try:
+        duration = (parse_time(event["endMs"]) - parse_time(event["startMs"])).total_seconds()
+        if duration >= 0:
+            lines.append(f"Duration: {duration:g} sec")
+    except (KeyError, ValueError, TypeError, AttributeError, OverflowError):
+        pass
+    return lines
+
+
+def notification(event, company, tz, *, video=False):
+    # HTML keeps the event link short. External text is escaped before formatting.
+    # company remains an argument for compatibility with existing configuration.
+    names = ", ".join(dict.fromkeys(display_label(x) for x in labels(event))) or "Safety Event"
+    lines = [f"<b>⚠️ {escape(clean(names, 160))}</b>", ""]
+    truck = (event.get("asset") or {}).get("name")
+    if truck:
+        lines.append(f"Truck: {escape(clean(truck, 80))}")
+    driver = (event.get("driver") or {}).get("name")
+    if not video and driver and clean(driver) != "0":
+        lines.append(f"Driver: {escape(clean(driver, 80))}")
+    if not video:
+        lines.extend(speeding_details(event))
     location = event.get("location") or {}
     address = location.get("address") or {}
     place = ", ".join(str(address[x]) for x in ("city", "state") if address.get(x))
-    if not place:
-        place = " ".join(str(address[x]) for x in ("streetNumber", "street") if address.get(x))
-    if not place and location.get("latitude") is not None and location.get("longitude") is not None:
-        place = f"{location['latitude']}, {location['longitude']}"
-    if place:
-        lines.append(f"📍 Location: {clean(place)}")
+    if place and not video:
+        lines.append(f"Location: {escape(clean(place, 120))}")
+    if event.get("startMs") is not None:
+        try:
+            when = parse_time(event["startMs"]).astimezone(ZoneInfo(tz))
+            clock = when.strftime("%I:%M %p %Z").lstrip("0")
+            lines.append(f"Time: {when:%b} {when.day}, {when.year}, {clock}")
+        except (ValueError, TypeError, AttributeError, OverflowError):
+            pass
     link = event.get("inboxEventUrl") or event.get("incidentReportUrl")
-    if link and link.startswith("https://"):
-        lines.append(f"🔗 Samsara: {clean(link, 1000)}")
-    lines.extend([f"🆔 Event ID: {clean(event['id'])}", "", "🎥 Video: se atașează separat când este disponibil prin API."])
+    if isinstance(link, str) and link.startswith("https://"):
+        lines.append(f'🔗 <a href="{escape(link, quote=True)}">Open in Samsara</a>')
     return "\n".join(lines)
 
 

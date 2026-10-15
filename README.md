@@ -8,6 +8,15 @@ Fus orar implicit **America/New_York**, EST/EDT automat. Fără rapoarte, clasam
 Vezi [instalarea Railway și activarea ulterioară a API-urilor](docs/RAILWAY.md).
 Instrucțiunile SQLite/volume Docker de mai jos se referă la rularea locală sau pe VPS.
 
+## Formatul alertelor
+
+Mesajele sunt scurte, cu titlul evenimentului, truck, numele șoferului dacă există,
+locația, ora New York și un link compact „Open in Samsara”. Pentru Speeding se afișează
+viteza maximă, limita, depășirea în mph și durata numai când sunt disponibile în API.
+Nu se afișează compania, ID-urile tehnice, Driver ID 0 sau textul despre așteptarea video.
+Videoclipul apare ca răspuns la alertă, cu descriere scurtă (eveniment, truck, oră, link).
+Media întârziată rămâne legată de alerta originală prin reply.
+
 ## Ce acoperă aplicația
 
 - Safety Events v2: `GET /safety-events/stream`, fără filtru de punctaj sau stare.

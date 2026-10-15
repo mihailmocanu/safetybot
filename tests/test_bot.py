@@ -37,13 +37,40 @@ class EventsTests(unittest.TestCase):
 
     def test_new_york_dst_and_missing_fields(self):
         text = notification(event(), "IDS Transportation", "America/New_York")
-        self.assertIn("14:35 EDT", text)
+        self.assertIn("2:35 PM EDT", text)
         self.assertIn("Harsh Braking", text)
         text = notification(event(startMs="2026-01-15T18:35:00Z", driver=None, asset=None, location=None), "IDS", "America/New_York")
-        self.assertIn("13:35 EST", text)
+        self.assertIn("1:35 PM EST", text)
         self.assertNotIn("Driver:", text)
         self.assertNotIn("Truck:", text)
         self.assertNotIn("Location:", text)
+
+    def test_compact_alert_hides_ids_and_escapes_external_text(self):
+        text = notification(event(
+            driver={"id": "0"}, asset={"name": "1720 <fleet>"},
+            inboxEventUrl="https://cloud.samsara.com/event?id=1&x=2",
+        ), "IDS Transportation", "America/New_York")
+        self.assertIn("Truck: 1720 &lt;fleet&gt;", text)
+        self.assertIn(">Open in Samsara</a>", text)
+        self.assertIn("?id=1&amp;x=2", text)
+        for unwanted in ("Driver ID", "Event ID", "Companie", "Video:", "SAMSARA SAFETY ALERT"):
+            self.assertNotIn(unwanted, text)
+
+    def test_speed_metrics_mph_and_actual_duration(self):
+        speeding = event(
+            behaviorLabels=[{"label": "ModerateSpeeding"}],
+            endMs="2026-10-15T18:37:39Z",
+            speedingMetadata={"maxSpeedKilometersPerHour": 116.0338944, "postedSpeedLimitKilometersPerHour": 97.0442112},
+        )
+        text = notification(speeding, "IDS", "America/New_York")
+        self.assertIn("Max speed: 72.1 mph", text)
+        self.assertIn("Posted limit: 60.3 mph", text)
+        self.assertIn("Over posted limit: 11.8 mph", text)
+        self.assertIn("Duration: 159 sec", text)
+        self.assertNotIn("Max speed", notification(event(), "IDS", "America/New_York"))
+        caption = notification(speeding, "IDS", "America/New_York", video=True)
+        self.assertIn("Moderate Speeding", caption)
+        self.assertNotIn("Max speed", caption)
 
     def test_rotating_urls_do_not_create_camera_duplicates(self):
         self.assertEqual(len(media_items(event(media=[{"input": "dashcamRoadFacing", "url": "a"}, {"input": "dashcamRoadFacing", "url": "b"}]))), 1)
@@ -109,6 +136,9 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
             await self.app.deliver(self.store.due()[0])
         self.bot.send_message.assert_awaited_once()
         self.bot.send_video.assert_awaited_once()
+        self.assertEqual(self.bot.send_video.call_args.kwargs["parse_mode"], "HTML")
+        self.assertNotIn("Event ID", self.bot.send_video.call_args.kwargs["caption"])
+        self.assertEqual(self.bot.send_video.call_args.kwargs["reply_parameters"].message_id, 5)
         self.assertFalse(written[0].exists())
 
     async def test_upload_failure_preserves_text_and_cleans_temporary_file(self):
