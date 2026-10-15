@@ -28,6 +28,12 @@ comunicarea se face în rețeaua privată Railway.
 sau Telegram. Nu inițializează cursorul; prima pornire activă stabilește începutul monitorizării.
 Acest mod permite verificarea deploymentului înainte de introducerea tokenurilor.
 
+Pentru configurare asistată, cu `BOT_ENABLED=false`, setează temporar `SETUP_ACTION=group-id`
+și aplică variabilele. La pornire botul citește updates Telegram și afișează în loguri numai
+username-ul botului și grupurile/ID-urile disponibile. Nu trimite mesaje și nu afișează tokenuri.
+După completarea ID-ului, `SETUP_ACTION=check` verifică Telegram și accesul Safety Events.
+După verificare, golește `SETUP_ACTION` înainte de activare.
+
 4. Setează **Serverless/Sleep off**, o singură replică, fără cron, restart **Always**,
    deployment overlap **0 secunde**, draining **45 secunde**. Folosește Dockerfile-ul din rădăcină;
    comanda implicită este `python -m safety_bot`. Nu seta healthcheck HTTP pentru workerul fără webhook.

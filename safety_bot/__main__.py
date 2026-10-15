@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from .app import run
 from .db import Store
+from .setup import main as setup
 
 
 async def start():
@@ -21,6 +22,11 @@ async def start():
         raise ValueError("DATABASE_URL is required on Railway")
     store = Store(os.getenv("DATABASE_PATH", "data/safety.sqlite3"), database_url)
     store.close()
+    action = os.getenv("SETUP_ACTION", "").strip()
+    if action:
+        if action not in ("group-id", "check"):
+            raise ValueError("SETUP_ACTION must be group-id or check")
+        await setup([action])
     logging.info("Database initialized. BOT_ENABLED=false: waiting for API configuration and activation.")
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -38,5 +44,6 @@ except KeyboardInterrupt:
     pass
 except Exception as exc:
     # Database URLs and signed URLs may appear in library exception messages.
-    logging.error("Startup/runtime failed (%s). Check configuration and service availability.", type(exc).__name__)
+    status = getattr(exc, "status", None)
+    logging.error("Startup/runtime failed (%s%s). Check configuration and service availability.", type(exc).__name__, f" HTTP {status}" if isinstance(status, int) else "")
     raise SystemExit(1) from None

@@ -12,10 +12,13 @@ from .samsara import Samsara
 from datetime import datetime, timedelta, timezone
 
 
-async def main():
+async def main(args=None):
     load_dotenv()
-    if sys.argv[1:] == ["group-id"]:
+    args = sys.argv[1:] if args is None else args
+    if args == ["group-id"]:
         async with Bot(os.environ["TELEGRAM_BOT_TOKEN"]) as bot:
+            me = await bot.get_me()
+            print(f"Telegram bot: @{me.username}", flush=True)
             updates = await bot.get_updates(timeout=0)
             groups = {}
             for update in updates:
@@ -25,9 +28,9 @@ async def main():
             for group_id, title in groups.items():
                 print(f"{group_id}: {title}")
             if not groups:
-                print("Adaugă botul în grup și trimite /groupid@username_bot, apoi repetă comanda.")
+                print(f"Adaugă botul în grup și trimite /groupid@{me.username}, apoi repetă verificarea.")
         return
-    if sys.argv[1:] != ["check"]:
+    if args != ["check"]:
         raise SystemExit("Usage: python -m safety_bot.setup group-id|check")
     cfg = Config.load()
     async with Bot(cfg.telegram_token) as bot:
