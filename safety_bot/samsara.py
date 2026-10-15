@@ -53,6 +53,31 @@ class Samsara:
         result = await self.get("/safety-events", {**self.expanded(), "safetyEventIds": event_id})
         return next((x for x in result["data"] if x["id"] == event_id), None)
 
+    async def pages(self, path, params):
+        items, after = [], None
+        while True:
+            query = dict(params)
+            if after:
+                query["after"] = after
+            page = await self.get(path, query)
+            items.extend(page["data"])
+            pagination = page["pagination"]
+            if not pagination["hasNextPage"]:
+                return items
+            cursor = pagination.get("endCursor")
+            if not cursor or cursor == after:
+                raise ValueError("Pagination did not advance")
+            after = cursor
+
+    async def speed_readings(self):
+        return await self.pages("/readings/latest", {
+            "readingIds": "samsaraSpeed,samsaraSpeedLimit,location",
+            "entityType": "asset", "assetTypes": "vehicle",
+        })
+
+    async def vehicles(self):
+        return await self.pages("/assets", {"type": "vehicle"})
+
     async def download(self, url, path):
         # Signed URLs from official event media. Do not forward the API Bearer token.
         host = urlsplit(url).hostname or ""

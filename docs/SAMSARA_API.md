@@ -67,6 +67,15 @@ este o sursă separată, cu intervale ale călătoriilor finalizate, fără gara
 Nu este importată de acest bot, pentru a nu crea două alerte pentru același incident din surse
 care nu au garantat un ID comun. Sunt urmărite toate **Safety Events expuse** cu etichetele Speeding.
 
+Suplimentar, modul `LIVE_SPEEDING_ENABLED` folosește acum
+[`GET /readings/latest`](https://developers.samsara.com/reference/getreadingssnapshot):
+`samsaraSpeed` și `samsaraSpeedLimit` (ambele m/s), cu Read Readings, iar
+[`GET /assets`](https://developers.samsara.com/reference/listassets) oferă numele camioanelor
+cu Read Assets. Acest mod compară strict viteză > limită la fiecare 60 secunde, independent
+de etichetele de severitate. Folosește numai perechi proaspete de date, maximum 120 secunde;
+depasirile între două eșantioane pot fi ratate. Nu presupune existența unui clip pentru o alertă
+generată direct din citiri; media se atașează când există un eveniment Safety corespunzător.
+
 ## Video oficial
 
 Schema Safety Events v2 oferă `media[]`, fiecare cu `input` și `url` pentru descărcare.

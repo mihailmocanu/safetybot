@@ -38,6 +38,8 @@ def parse_time(value):
 
 
 def display_label(label):
+    if label in CATEGORIES["Speeding"]:
+        return "Speeding Alert"
     return DISPLAY.get(label, re.sub(r"(?<=[a-z])(?=[A-Z])", " ", label))
 
 
@@ -60,7 +62,8 @@ def speeding_details(event):
     limit = speed("postedSpeedLimitKilometersPerHour")
     lines = []
     if maximum is not None:
-        lines.append(f"Max speed: {maximum:.1f} mph")
+        title = "Speed" if event.get("_source") == "live-speeding" and not event.get("_samsaraEventId") else "Max speed"
+        lines.append(f"{title}: {maximum:.1f} mph")
     if limit is not None and limit > 0:
         lines.append(f"Posted limit: {limit:.1f} mph")
         if maximum is not None and maximum >= limit:
@@ -90,6 +93,8 @@ def notification(event, company, tz, *, video=False):
     location = event.get("location") or {}
     address = location.get("address") or {}
     place = ", ".join(str(address[x]) for x in ("city", "state") if address.get(x))
+    if not place:
+        place = event.get("_location")
     if place and not video:
         lines.append(f"Location: {escape(clean(place, 120))}")
     if event.get("startMs") is not None:

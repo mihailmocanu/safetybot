@@ -32,8 +32,24 @@ class PostgresTests(unittest.TestCase):
             store = Store(database_url=url)
             self.assertEqual(store.get("cursor"), "cursor-test")
             self.assertEqual(store.due()[0]["message_id"], 9000000001)
+            sample = {"asset_id": "postgres-test-truck", "timestamp": 1000,
+                      "time": "1970-01-01T00:16:40Z", "speed_kph": 98,
+                      "limit_kph": 96, "over": True}
+            self.assertEqual(store.record_speed_samples([sample], {"postgres-test-truck": {"id": "postgres-test-truck", "name": "Test"}}), 1)
+            store.save_page([{
+                "id": "postgres-official-speed-test", "asset": {"id": "postgres-test-truck"},
+                "behaviorLabels": [{"label": "ModerateSpeeding"}],
+                "startMs": "1970-01-01T00:16:30Z", "endMs": "1970-01-01T00:18:00Z", "media": [],
+            }], None, live_speeding=True)
+            self.assertEqual(store.db.execute("SELECT COUNT(*) AS n FROM speed_media").fetchone()["n"], 1)
         finally:
             with store.db:
+                episodes = store.db.execute("SELECT id FROM speed_episodes WHERE asset_id=?", ("postgres-test-truck",)).fetchall()
+                for episode in episodes:
+                    store.db.execute("DELETE FROM events WHERE id=?", (episode["id"],))
+                store.db.execute("DELETE FROM speed_media WHERE id=?", ("postgres-official-speed-test",))
+                store.db.execute("DELETE FROM speed_state WHERE asset_id=?", ("postgres-test-truck",))
+                store.db.execute("DELETE FROM speed_episodes WHERE asset_id=?", ("postgres-test-truck",))
                 store.db.execute("DELETE FROM videos WHERE event_id=?", ("postgres-integration-test",))
                 store.db.execute("DELETE FROM events WHERE id=?", ("postgres-integration-test",))
                 store.db.execute("DELETE FROM meta WHERE key='cursor' AND value='cursor-test'")

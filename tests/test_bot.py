@@ -69,7 +69,7 @@ class EventsTests(unittest.TestCase):
         self.assertIn("Duration: 159 sec", text)
         self.assertNotIn("Max speed", notification(event(), "IDS", "America/New_York"))
         caption = notification(speeding, "IDS", "America/New_York", video=True)
-        self.assertIn("Moderate Speeding", caption)
+        self.assertIn("Speeding Alert", caption)
         self.assertNotIn("Max speed", caption)
 
     def test_rotating_urls_do_not_create_camera_duplicates(self):
@@ -157,6 +157,14 @@ class DeliveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.store.due()[0]["message_id"], 5)
         self.assertFalse(self.store.video_sent("event-1", "dashcamRoadFacing"))
         self.assertFalse(written[0].exists())
+
+    async def test_live_speeding_without_official_event_does_not_request_fake_samsara_id(self):
+        live = event(_source="live-speeding", behaviorLabels=[{"label": "Speeding"}])
+        self.store.save_page([live], None)
+        with patch("safety_bot.app.asyncio.sleep", new=AsyncMock()):
+            await self.app.deliver(self.store.due()[0])
+        self.api.event.assert_not_awaited()
+        self.bot.send_message.assert_awaited_once()
 
 
 if __name__ == "__main__":

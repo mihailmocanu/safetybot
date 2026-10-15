@@ -53,6 +53,38 @@ prima activare dacă dorești și ultimele 24 ore.
 
 ## Persistență și operare
 
+### Speeding după limita locală
+
+`LIVE_SPEEDING_ENABLED=true` activează verificarea `samsaraSpeed > samsaraSpeedLimit`
+din `GET /readings/latest`, la intervalul `POLL_INTERVAL_SECONDS` (60 secunde).
+Ambele valori API sunt în m/s; afișarea este în mph. Nu se aplică prag de severitate,
+marjă de mph sau durată minimă. Limita 60 mph: 60 nu declanșează, 61 declanșează.
+
+Tokenul necesită suplimentar **Read Readings** și **Read Assets** (pentru numerele camioanelor).
+`SPEEDING_API_CHECK=true` verifică aceste două endpointuri la pornire și afișează numai
+coduri HTTP și număr de înregistrări; monitorizarea celorlalte categorii continuă.
+Activează modul live doar după confirmarea permisiunilor și a datelor din organizație.
+
+Se trimite o singură alertă pe episodul observat de depășire. O citire ulterioară la sau sub
+limită încheie episodul; o nouă depășire produce o nouă alertă. Starea rămâne în PostgreSQL
+după restart. Datele absente/mai vechi de 120 secunde nu declanșează și nu încheie episoade.
+La eșantionare la 60 secunde, o depășire care începe și se termină între două verificări poate
+fi ratată. Nu se promite acoperirea tuturor depășirilor de foarte scurtă durată.
+
+În modul live, evenimentele Safety Events exclusiv Speeding sunt folosite pentru a atașa
+media oficială episodului corespunzător (același asset și interval suprapus, toleranță 120s),
+fără o a doua notificare Light/Moderate/Heavy/Severe. Evenimentele oficiale fără un episod live
+corespunzător își păstrează alerta, inclusiv la întreruperea datelor Readings. Dacă un eșantion
+live ajunge ulterior, adoptă alerta oficială existentă și confirmarea ei. Evenimentele mixte (ex. Speeding + Crash)
+își păstrează notificarea Safety. Unele depășiri live nu generează un eveniment video Samsara;
+în acel caz alerta conține doar valorile măsurate, fără un clip sau link inventat.
+Pentru un episod continuu se păstrează prima sursă oficială cu media disponibilă,
+cu câte un clip pe intrare cameră; un eveniment ulterior gol nu înlocuiește clipul în așteptare.
+
+Surse: [Readings Snapshot](https://developers.samsara.com/reference/getreadingssnapshot),
+[Readings](https://developers.samsara.com/docs/readings),
+[Assets](https://developers.samsara.com/reference/listassets).
+
 La pornire sunt create automat tabelele `meta`, `events` și `videos`, plus indexul cozii.
 PostgreSQL păstrează cursorul și confirmările de trimitere între restarturile botului.
 O blocare PostgreSQL pe sesiune împiedică rularea simultană a două instanțe pe aceeași bază.

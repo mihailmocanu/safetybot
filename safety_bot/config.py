@@ -20,6 +20,8 @@ class Config:
     base_url: str = "https://api.samsara.com"
     webhook_secret: bytes = field(default=b"", repr=False)
     webhook_port: int = 8080
+    live_speeding: bool = False
+    speeding_api_check: bool = False
 
     @classmethod
     def load(cls):
@@ -40,6 +42,8 @@ class Config:
             base_url=os.getenv("SAMSARA_BASE_URL", "https://api.samsara.com").rstrip("/"),
             webhook_secret=base64.b64decode(os.getenv("SAMSARA_WEBHOOK_SECRET", ""), validate=True),
             webhook_port=int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", "8080"))),
+            live_speeding=os.getenv("LIVE_SPEEDING_ENABLED", "false").lower() == "true",
+            speeding_api_check=os.getenv("SPEEDING_API_CHECK", "false").lower() == "true",
         )
         ZoneInfo(cfg.timezone)
         if cfg.interval < 1 or cfg.lookback_hours < 0:

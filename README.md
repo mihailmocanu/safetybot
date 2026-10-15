@@ -17,6 +17,11 @@ Nu se afișează compania, ID-urile tehnice, Driver ID 0 sau textul despre aște
 Videoclipul apare ca răspuns la alertă, cu descriere scurtă (eveniment, truck, oră, link).
 Media întârziată rămâne legată de alerta originală prin reply.
 
+Toate nivelurile de Speeding au titlul comun **Speeding Alert**. Modul opțional
+`LIVE_SPEEDING_ENABLED=true` compară direct viteza cu limita locală din Readings API,
+la 60 secunde, cu o alertă pe episodul observat. Necesită Read Readings și Read Assets;
+vezi [configurarea regulii și limitele eșantionării](docs/RAILWAY.md).
+
 ## Ce acoperă aplicația
 
 - Safety Events v2: `GET /safety-events/stream`, fără filtru de punctaj sau stare.
