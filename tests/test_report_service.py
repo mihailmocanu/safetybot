@@ -13,8 +13,10 @@ from zoneinfo import ZoneInfo
 from safety_bot.app import Application
 from safety_bot.config import Config
 from safety_bot.db import Store
+from safety_bot.events import CATEGORIES
 from safety_bot.report_service import Reporting, missed_windows
 from safety_bot.reports import report_windows
+from safety_bot.samsara import Samsara
 
 
 UTC = timezone.utc
@@ -140,6 +142,52 @@ class ReportServiceTests(unittest.IsolatedAsyncioTestCase):
         self.api.safety_history.reset_mock()
         await self.reporting.backfill()
         self.api.safety_history.assert_not_awaited()
+
+    async def test_cancel_mid_page_yields_and_replays_without_advancing_cursor(self):
+        self.initialize()
+        history_start, history_end = self.store.get("report_history_start"), self.store.get("report_history_end")
+        records = [event(f"history-{i}", NOW.timestamp() - i * 60) for i in range(25)]
+        self.api.safety_history.return_value = {
+            "data": records, "pagination": {"hasNextPage": False, "endCursor": "whole-page"},
+        }
+        task = asyncio.create_task(self.reporting.backfill())
+        # The importer runs one batch, commits, and yields to the event loop.
+        # A concurrent task can then cancel it before any page cursor is saved.
+        await asyncio.sleep(0)
+        self.assertEqual(self.store.db.execute("SELECT COUNT(*) AS n FROM speeding_occurrences").fetchone()["n"], 10)
+        self.assertFalse(self.store.db.in_transaction)
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertIsNone(self.store.get("report_history_cursor"))
+        self.assertIsNone(self.store.get("report_history_complete"))
+        self.reopen()
+        self.api.safety_history.reset_mock()
+        await self.reporting.backfill()
+        self.api.safety_history.assert_awaited_once_with(history_start, history_end, None)
+        self.assertEqual(self.store.db.execute("SELECT COUNT(*) AS n FROM speeding_occurrences").fetchone()["n"], 25)
+        self.assertEqual(self.store.get("report_history_cursor"), "whole-page")
+        self.assertEqual(self.store.get("report_history_complete"), history_end)
+        self.assertEqual(self.store.due(), [])
+        self.bot.send_message.assert_not_awaited()
+
+    async def test_samsara_history_filters_speeding_and_keeps_snapshot_boundaries(self):
+        api = Samsara(None, "unused", "https://api.samsara.com")
+        page = {"data": [], "pagination": {"hasNextPage": False}}
+        api.get = AsyncMock(return_value=page)
+        start, end = "2026-08-17T18:00:00+00:00", NOW.isoformat()
+        self.assertIs(await api.safety_history(start, end, "next-page"), page)
+        path, params = api.get.await_args.args
+        self.assertEqual(path, "/safety-events/stream")
+        self.assertEqual(params["startTime"], start)
+        self.assertEqual(params["endTime"], end)
+        self.assertEqual(params["after"], "next-page")
+        self.assertEqual(params["queryByTimeField"], "createdAtTime")
+        self.assertEqual(set(params["behaviorLabels"].split(",")), CATEGORIES["Speeding"])
+        self.assertEqual(params["includeVgOnlyEvents"], "true")
+        self.assertEqual(params["includeAsset"], "true")
+        await api.safety_history(start, end)
+        self.assertNotIn("after", api.get.await_args.args[1])
 
     async def test_report_waits_for_live_stream_checkpoint_before_freezing(self):
         job = self.latest_weekly_job()

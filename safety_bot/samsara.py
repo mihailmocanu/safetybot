@@ -79,8 +79,10 @@ class Samsara:
         return await self.pages("/assets", {"type": "vehicle"})
 
     async def safety_history(self, start, end, cursor=None):
+        from .events import CATEGORIES
         params = {**self.expanded(), "startTime": start, "endTime": end,
-                  "queryByTimeField": "createdAtTime"}
+                  "queryByTimeField": "createdAtTime",
+                  "behaviorLabels": ",".join(sorted(CATEGORIES["Speeding"]))}
         if cursor:
             params["after"] = cursor
         return await self.get("/safety-events/stream", params)

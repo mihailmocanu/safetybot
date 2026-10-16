@@ -41,6 +41,7 @@ class Application:
                 # Fairness: page limit per pass; cursor persists every page.
                 for _ in range(100):
                     old_cursor = self.store.get("cursor")
+                    requested_at = time.time()
                     page = await self.api.stream(self.store.get("start_time"), old_cursor)
                     events = page["data"]
                     for event in events:
@@ -54,7 +55,7 @@ class Application:
                     self.store.save_page([x for x in events if selected(x)], cursor, live_speeding=self.cfg.live_speeding)
                     if not pagination["hasNextPage"]:
                         with self.store.db:
-                            self.store.put("stream_caught_up_at", str(time.time()))
+                            self.store.put("stream_caught_up_at", str(requested_at))
                         break
                     if self.stop.is_set():
                         break

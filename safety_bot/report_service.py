@@ -67,11 +67,21 @@ class Reporting:
                     raise ValueError("History pagination did not advance")
                 # History is an independent ledger import; no Telegram queue or
                 # live stream cursor is changed, even when a page is replayed.
+                records = page["data"]
+                for offset in range(0, len(records), 10):
+                    # Commit small batches and yield outside a transaction.
+                    # A crash before saving the page cursor safely replays IDs.
+                    self.store.import_speeding_history(records[offset:offset + 10])
+                    await asyncio.sleep(0)
+                    if self.stop.is_set():
+                        return
                 with self.store.db:
-                    self.store.import_speeding_history(page["data"], next_cursor)
+                    if next_cursor:
+                        self.store.put("report_history_cursor", next_cursor)
                     if not pagination["hasNextPage"]:
                         self.store.put("report_history_complete", self.store.get("report_history_end"))
                 failures = 0
+                log.info("Speeding history page imported: records=%s more=%s", len(records), pagination["hasNextPage"])
                 if not pagination["hasNextPage"]:
                     count = self.store.db.execute("SELECT COUNT(*) AS n FROM speeding_occurrences").fetchone()["n"]
                     log.info("Speeding history import complete: 60-day API window; recorded incidents=%s; historical alerts not queued", count)
