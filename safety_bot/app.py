@@ -6,6 +6,7 @@ from pathlib import Path
 import random
 import signal
 import tempfile
+import time
 
 import aiohttp
 from aiogram import Bot
@@ -17,6 +18,7 @@ from .db import Store
 from .events import MONITORED, labels, media_items, notification, selected
 from .samsara import ApiError, Samsara, telegram_size
 from .speeding import speed_samples
+from .report_service import Reporting
 from .webhook import start_webhook
 
 log = logging.getLogger("safety_bot")
@@ -51,6 +53,8 @@ class Application:
                         raise ValueError("Pagination did not advance")
                     self.store.save_page([x for x in events if selected(x)], cursor, live_speeding=self.cfg.live_speeding)
                     if not pagination["hasNextPage"]:
+                        with self.store.db:
+                            self.store.put("stream_caught_up_at", str(time.time()))
                         break
                     if self.stop.is_set():
                         break
@@ -82,6 +86,10 @@ class Application:
         event = json.loads(row["payload"])
         text_id = row["message_id"]
         if text_id is None:
+            if self.cfg.reports_enabled:
+                count = self.store.alert_speeding_count(event_id)
+                if count is not None:
+                    event = dict(event, _speeding_count_30d=count)
             self.store.check_connection()
             message = await self.bot.send_message(
                 self.cfg.group_id, notification(event, self.cfg.company, self.cfg.timezone),
@@ -124,7 +132,6 @@ class Application:
         self.store.schedule(event_id, 6 * 3600 if media_items(event) else 15 * 60)
 
     async def poll_speeding(self):
-        import time
         failures = 0
         while not self.stop.is_set():
             delay = self.cfg.interval
@@ -202,6 +209,9 @@ async def run():
         async with aiohttp.ClientSession() as session:
             api = Samsara(session, cfg.samsara_token, cfg.base_url)
             app = Application(cfg, store, api, bot)
+            reporting = Reporting(cfg, store, api, bot, app.stop) if cfg.reports_enabled else None
+            if reporting:
+                reporting.initialize()
             if cfg.speeding_api_check:
                 # Read-only scope/data probe; other safety monitoring keeps running.
                 try:
@@ -228,6 +238,9 @@ async def run():
                 tasks.create_task(app.worker())
                 if cfg.live_speeding:
                     tasks.create_task(app.poll_speeding())
+                if reporting:
+                    tasks.create_task(reporting.backfill())
+                    tasks.create_task(reporting.worker())
     finally:
         if runner:
             await runner.cleanup()

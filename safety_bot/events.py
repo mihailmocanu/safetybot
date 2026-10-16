@@ -90,6 +90,9 @@ def notification(event, company, tz, *, video=False):
         lines.append(f"Driver: {escape(clean(driver, 80))}")
     if not video:
         lines.extend(speeding_details(event))
+        count = event.get("_speeding_count_30d")
+        if isinstance(count, int) and count > 0:
+            lines.append(f"Speeding incidents in past 30 days: {count}")
     location = event.get("location") or {}
     address = location.get("address") or {}
     place = ", ".join(str(address[x]) for x in ("city", "state") if address.get(x))

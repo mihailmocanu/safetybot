@@ -18,6 +18,7 @@ COMPANY_NAME=IDS Transportation
 POLL_INTERVAL_SECONDS=60
 INITIAL_LOOKBACK_HOURS=0
 BOT_ENABLED=false
+SPEEDING_REPORTS_ENABLED=false
 ```
 
 Numele `Postgres` trebuie să corespundă serviciului de bază de date.
@@ -53,6 +54,28 @@ prima activare dacă dorești și ultimele 24 ore.
 
 ## Persistență și operare
 
+### Rapoarte și contor Speeding
+
+După activarea botului, setează `SPEEDING_REPORTS_ENABLED=true` în Variables și aplică
+modificarea printr-un deployment nou. Păstrează `TIMEZONE=America/New_York` pentru programul ales:
+duminică la **20:00**, respectiv pe data de **1 la 08:00**. Nu adăuga un Railway Cron Job;
+planificarea este inclusă în workerul care rulează permanent.
+
+La prima activare se importă separat 60 de zile de Safety Events disponibile tokenului.
+Importul completează evidența incidentelor pentru calcule; nu creează notificări istorice
+și nu schimbă cursorul monitorizării curente. Contorul din alerte și rapoartele pornesc
+după terminarea importului. `INITIAL_LOOKBACK_HOURS=0` poate rămâne neschimbat.
+
+PostgreSQL păstrează incidentele, legăturile dintre evenimente și episoadele live,
+scadențele rapoartelor și confirmările fiecărui mesaj. Prima activare a rapoartelor
+nu trimite rapoarte pentru scadențe anterioare activării; după restart se recuperează
+scadențele ratate. Păstrează o singură replică și volumul bazei.
+
+Rapoartele numără incidente înregistrate, fără punctaje. Istoricul Safety Events nu este
+o înregistrare a fiecărei depășiri brute a limitei. Pentru regula directă viteză > limită,
+modul live de mai jos necesită separat acces Read Readings; activarea rapoartelor
+nu activează automat această funcție. Vezi [detaliile rapoartelor](REPORTS.md).
+
 ### Speeding după limita locală
 
 `LIVE_SPEEDING_ENABLED=true` activează verificarea `samsaraSpeed > samsaraSpeedLimit`
@@ -85,8 +108,9 @@ Surse: [Readings Snapshot](https://developers.samsara.com/reference/getreadingss
 [Readings](https://developers.samsara.com/docs/readings),
 [Assets](https://developers.samsara.com/reference/listassets).
 
-La pornire sunt create automat tabelele `meta`, `events` și `videos`, plus indexul cozii.
-PostgreSQL păstrează cursorul și confirmările de trimitere între restarturile botului.
+La pornire sunt create automat tabelele de monitorizare, episoade live și rapoarte,
+plus indexurile necesare. PostgreSQL păstrează cursorul, istoricul incidentelor
+și confirmările de trimitere între restarturile botului.
 O blocare PostgreSQL pe sesiune împiedică rularea simultană a două instanțe pe aceeași bază.
 La pierderea conexiunii, procesul se poate opri și Railway îl repornește conform politicii.
 

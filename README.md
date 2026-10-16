@@ -2,7 +2,8 @@
 
 Bot Python/aiogram pentru IDS Transportation: notificări automate într-un singur grup,
 apoi upload direct al clipurilor oficiale Samsara, ca răspuns la notificare.
-Fus orar implicit **America/New_York**, EST/EDT automat. Fără rapoarte, clasamente sau comenzi de lucru.
+Fus orar implicit **America/New_York**, EST/EDT automat. Opțional, numără incidentele Speeding
+pe camion în ultimele 30 de zile și trimite rapoarte săptămânale și lunare, fără punctaje.
 
 **Deployment Railway:** folosește PostgreSQL separat prin `DATABASE_URL`.
 Vezi [instalarea Railway și activarea ulterioară a API-urilor](docs/RAILWAY.md).
@@ -22,6 +23,14 @@ Toate nivelurile de Speeding au titlul comun **Speeding Alert**. Modul opțional
 la 60 secunde, cu o alertă pe episodul observat. Necesită Read Readings și Read Assets;
 vezi [configurarea regulii și limitele eșantionării](docs/RAILWAY.md).
 
+Cu `SPEEDING_REPORTS_ENABLED=true`, alerta Speeding include numărul incidentelor înregistrate
+pentru acel camion în ultimele 30 de zile, inclusiv incidentul curent. După importul inițial
+al istoricului, botul trimite un raport duminica la **20:00** și unul pe data de **1 la 08:00**,
+ora New York. Raportul săptămânal arată ultimele 7 zile și totalul pe 30 de zile;
+raportul lunar folosește mereu ultimele 30 de zile. Ambele includ totalul flotei,
+numărul camioanelor cu incidente și Top 10 după numărul incidentelor, fără puncte.
+Vezi [perioadele, deduplicarea și limitele istoricului](docs/REPORTS.md).
+
 ## Ce acoperă aplicația
 
 - Safety Events v2: `GET /safety-events/stream`, fără filtru de punctaj sau stare.
@@ -33,6 +42,8 @@ vezi [configurarea regulii și limitele eșantionării](docs/RAILWAY.md).
   separat pentru fiecare cameră returnată de API. Nu se inventează șoferul, adresa sau linkul.
 - Fișierele se descarcă temporar, se încarcă prin `sendVideo` și se șterg inclusiv la eroare.
 - Pentru clipuri peste 49 MB se încearcă micșorarea cu FFmpeg, inclus în Docker.
+- Rapoarte opționale și contor Speeding pe 30 de zile, cu istoric și confirmări de trimitere
+  păstrate în aceeași bază de date. Importul pentru rapoarte nu trimite alerte istorice.
 
 Vezi [verificarea API și limitele reale](docs/SAMSARA_API.md) înainte de activare.
 Implementarea folosește etichetele expuse de API; categoriile dashboard nu sunt parametri API.

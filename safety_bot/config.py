@@ -22,6 +22,7 @@ class Config:
     webhook_port: int = 8080
     live_speeding: bool = False
     speeding_api_check: bool = False
+    reports_enabled: bool = False
 
     @classmethod
     def load(cls):
@@ -44,6 +45,7 @@ class Config:
             webhook_port=int(os.getenv("PORT", os.getenv("WEBHOOK_PORT", "8080"))),
             live_speeding=os.getenv("LIVE_SPEEDING_ENABLED", "false").lower() == "true",
             speeding_api_check=os.getenv("SPEEDING_API_CHECK", "false").lower() == "true",
+            reports_enabled=os.getenv("SPEEDING_REPORTS_ENABLED", "false").lower() == "true",
         )
         ZoneInfo(cfg.timezone)
         if cfg.interval < 1 or cfg.lookback_hours < 0:

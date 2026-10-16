@@ -78,6 +78,13 @@ class Samsara:
     async def vehicles(self):
         return await self.pages("/assets", {"type": "vehicle"})
 
+    async def safety_history(self, start, end, cursor=None):
+        params = {**self.expanded(), "startTime": start, "endTime": end,
+                  "queryByTimeField": "createdAtTime"}
+        if cursor:
+            params["after"] = cursor
+        return await self.get("/safety-events/stream", params)
+
     async def download(self, url, path):
         # Signed URLs from official event media. Do not forward the API Bearer token.
         host = urlsplit(url).hostname or ""
